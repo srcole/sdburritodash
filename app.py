@@ -26,46 +26,32 @@ app.layout = html.Div([html.H4(children='San Diego Burrito Dashboard'),
                 value='overall'
             )
         ],
-        style={'width': '48%', 'display': 'inline-block'}),
+        style={'width': '20%', 'display': 'inline-block'}),
 
-        html.Div(['FILLER'
-        ],style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
+        html.Div(['Choose a burrito feature and see the top taco shops!'
+        ],style={'width': '76%', 'float': 'right', 'display': 'inline-block'})
     ]),
 
     dcc.Graph(id='bar_rank')
 ])
-
-# figure={
-#             'data': [
-#                 {'x': [1, 2, 3], 'y': [4, 1, 4],
-#                 'type': 'bar', 'name': 'SF'},
-#                 {'x': [1, 2, 3], 'y': [3, 5, 2],
-#                 'type': 'bar', 'name': u'Montréal'},
-#             ],
-#             'layout': {
-#                 'title': 'My stupid bar chart',
-#                 'plot_bgcolor': colors['background'],
-#                 'paper_bgcolor': colors['background'],
-#                 'font': {
-#                     'color': colors['text']
-#                 }
-#             }
-#         }
 
 @app.callback(
     dash.dependencies.Output('bar_rank', 'figure'),
     [dash.dependencies.Input('feature_rank', 'value')])
 def update_graph(feature_name):
     # Get the top 10 restaurants
-    dff = df.sort_values(by=feature_name, ascending=False).reset_index()[['Location', feature_name]]
-    dff = dff.loc[:5]
+    dff = df.sort_values(by=feature_name).reset_index()[['Location', feature_name]]
+    dff = dff.loc[len(dff)-10:]
 
     return {
-        'data': [{'x': dff['Location'], 'y': dff[feature_name], 'type': 'bar'}],
+        'data': [{'x': dff[feature_name],
+                  'y': dff['Location'],
+                  'type': 'bar',
+                  'orientation': 'h'}],
         'layout': go.Layout(
-            xaxis={'title': 'Taco Shop'},
-            yaxis={'title': 'Average ' + feature_name},
-            margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
+            yaxis={'title': ''},
+            xaxis={'title': 'Average ' + feature_name + ' rating'},
+            margin={'l': 200, 'b': 40, 't': 10, 'r': 0},
             hovermode='closest'
         )
     }

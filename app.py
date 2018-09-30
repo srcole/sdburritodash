@@ -12,26 +12,63 @@ server = app.server
 
 # Load data
 df = pd.read_csv('burrito_data_shops.csv', index_col=0)
+feature_list = ['Cost', 'Volume', 'Tortilla', 'Temp', 'Meat',
+                'Fillings', 'Meat:filling', 'Uniformity', 'Salsa',
+                'Synergy', 'Wrap', 'overall']
 
+app.layout = html.Div([html.H4(children='San Diego Burrito Dashboard'),
+    html.Div([
 
-# Make a table
-def generate_table(dataframe, max_rows=10):
-    return html.Table(
-        # Header
-        [html.Tr([html.Th(col) for col in dataframe.columns])] +
+        html.Div([
+            dcc.Dropdown(
+                id='feature_rank',
+                options=[{'label': i, 'value': i} for i in feature_list],
+                value='overall'
+            )
+        ],
+        style={'width': '48%', 'display': 'inline-block'}),
 
-        # Body
-        [html.Tr([
-            html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-        ]) for i in range(min(len(dataframe), max_rows))]
-    )
+        html.Div(['FILLER'
+        ],style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
+    ]),
 
-
-# Set layout of app
-app.layout = html.Div(children=[
-    html.H4(children='Burrito table'),
-    generate_table(df)
+    dcc.Graph(id='bar_rank')
 ])
+
+# figure={
+#             'data': [
+#                 {'x': [1, 2, 3], 'y': [4, 1, 4],
+#                 'type': 'bar', 'name': 'SF'},
+#                 {'x': [1, 2, 3], 'y': [3, 5, 2],
+#                 'type': 'bar', 'name': u'Montréal'},
+#             ],
+#             'layout': {
+#                 'title': 'My stupid bar chart',
+#                 'plot_bgcolor': colors['background'],
+#                 'paper_bgcolor': colors['background'],
+#                 'font': {
+#                     'color': colors['text']
+#                 }
+#             }
+#         }
+
+@app.callback(
+    dash.dependencies.Output('bar_rank', 'figure'),
+    [dash.dependencies.Input('feature_rank', 'value')])
+def update_graph(feature_name):
+    # Get the top 10 restaurants
+    dff = df.sort_values(by=feature_name, ascending=False).reset_index()[['Location', feature_name]]
+    dff = dff.loc[:5]
+
+    return {
+        'data': [{'x': dff['Location'], 'y': dff[feature_name], 'type': 'bar'}],
+        'layout': go.Layout(
+            xaxis={'title': 'Taco Shop'},
+            yaxis={'title': 'Average ' + feature_name},
+            margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
+            hovermode='closest'
+        )
+    }
 
 # Run the Dash app
 if __name__ == '__main__':

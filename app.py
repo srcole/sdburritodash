@@ -8,6 +8,7 @@ import plotly.graph_objs as go
 # Initialize app with desired style
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
 
 # Load data
 df = pd.read_csv('burrito_data_shops.csv', index_col=0)

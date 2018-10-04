@@ -4,6 +4,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import pandas as pd
 import plotly.graph_objs as go
+import numpy as np
 
 # Initialize app with desired style
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -97,6 +98,7 @@ def update_graph(clickData, feature_name):
                   'y': dff['Location'],
                   'type': 'bar',
                   'orientation': 'h',
+                  'unselected': {'marker': {'opacity': 0.5, 'color': 'black'}},
                   'selectedpoints': [list(dff['Location']).index(rest_chose)]}],
         'layout': go.Layout(
             yaxis={'title': ''},
@@ -131,6 +133,7 @@ def make_bar_features(clickData, feature_selected):
                   'title': rest_chose,
                   'type': 'bar',
                   'orientation': 'h',
+                  'unselected': {'marker': {'opacity': 0.5, 'color': 'black'}},
                   'selectedpoints': [list(feature_dict.keys()).index(feature_selected)]}],
         'layout': go.Layout(
             yaxis={'title': ''},
@@ -179,6 +182,8 @@ def make_scatter(clickData, featx, featy):
             y=df[featy],
             text=['{:s}<br>${:.2f}'.format(loc, price) for loc, price in zip(df['Location'], df[featx])],
             mode='markers',
+            marker={'size': 6 + 5 * np.log10(df['N'])},
+            unselected={'marker': {'opacity': 0.5, 'color': 'black'}},
             selectedpoints=[df_rest.index[0]])],
 
         'layout': go.Layout(

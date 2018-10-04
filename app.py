@@ -12,6 +12,8 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 app.title = 'San Diego Burrito Dashboard'
 
+mapbox_access_token = 'pk.eyJ1IjoiYWxpc2hvYmVpcmkiLCJhIjoiY2ozYnM3YTUxMDAxeDMzcGNjbmZyMmplZiJ9.ZjmQ0C2MNs1AzEBC_Syadg'
+
 # Load data
 df = pd.read_csv('burrito_data_shops.csv', index_col=0)
 feature_list = ['Cost', 'Volume', 'Tortilla', 'Temp', 'Meat',
@@ -24,32 +26,34 @@ feature_plt_list = ['Tortilla', 'Temp', 'Meat', 'Fillings',
 # Make app layour
 app.layout = html.Div([
     html.Div([
-        html.H4('San Diego Burrito Dashboard',
-                style={'width': '40%', 'display': 'inline-block'}),
 
-        html.H6(html.A('See raw data', href='https://docs.google.com/spreadsheets/d/18HkrklYz1bKpDLeL-kaMrGjAhUM6LeJMIACwEljCgaw/edit?usp=sharing'),
-                style={'width': '50%', 'float': 'right', 'display': 'inline-block'})
-    
-    ]),
-    
-    html.Div([
+        html.Div(['Burrito feature:'],
+                 style={'width': '12%', 'display': 'inline-block', 'fontSize': 24}),
 
-        html.Div([
-            dcc.Dropdown(
+        html.Div([dcc.Dropdown(
                 id='feature_rank',
                 options=[{'label': i, 'value': i} for i in feature_list],
-                value='overall'
-            )
-        ],
-        style={'width': '20%', 'display': 'inline-block'}),
+                value='overall')],
+            style={'width': '10%', 'display': 'inline-block'}),
 
-        html.Div(['Choose a burrito feature and see the top taco shops!'],
-                 style={'width': '76%', 'float': 'right', 'display': 'inline-block'})
+        html.Div([''],
+            style={'width': '5%', 'display': 'inline-block'}),
+
+
+        html.H1('San Diego Burrito Dashboard',
+                style={'width': '50%', 'display': 'inline-block'}),
+
+        html.Div(html.A('See raw data', href='https://docs.google.com/spreadsheets/d/18HkrklYz1bKpDLeL-kaMrGjAhUM6LeJMIACwEljCgaw/edit?usp=sharing'),
+                style={'width': '15%', 'float': 'right', 'display': 'inline-block', 'fontSize': 24})
+    
     ]),
 
     html.Div([
+        dcc.Graph(id='burrito_map',
+                  style={'width': '32%', 'display': 'inline-block'}),
+
         dcc.Graph(id='bar_rank',
-                  style={'width': '48%', 'display': 'inline-block'}),
+                  style={'width': '36%', 'display': 'inline-block'}),
 
         html.Div([
             html.Div([
@@ -71,27 +75,71 @@ app.layout = html.Div([
                 ]),
             dcc.Graph(id='scatter_features'),
             dcc.Graph(id='bar_features')],
-            style={'width': '48%', 'float': 'right',
+            style={'width': '28%', 'float': 'right',
                    'display': 'inline-block'}),
 
     ])
 ])
 
 @app.callback(
-    dash.dependencies.Output('bar_rank', 'figure'),
-    [dash.dependencies.Input('bar_rank', 'clickData'),
+    dash.dependencies.Output('burrito_map', 'figure'),
+    [dash.dependencies.Input('burrito_map', 'clickData'),
      dash.dependencies.Input('feature_rank', 'value')])
-def update_graph(clickData, feature_name):
+def update_map(clickData, feature_name):
     # Determine restaurant selected
     # Set default for chosen restaurant
     if clickData is None:
         rest_chose = 'taco stand'
     else:
-        rest_chose = clickData['points'][0]['y']
+        rest_chose = clickData['points'][0]['id']
+
+    norm_feature = np.exp(df[feature_name])
+    norm_feature = norm_feature - np.min(norm_feature)
+    norm_feature = 6 + 10*(norm_feature / np.max(norm_feature))
+
+    return {'data': [go.Scattermapbox(
+                        lat=df['Latitude'],
+                        lon=df['Longitude'],
+                        ids=df['Location'],
+                        mode='markers',
+                        marker={'size': norm_feature},
+                        hoverinfo='text',
+                        selectedpoints=[list(df['Location']).index(rest_chose)],
+                        unselected={'marker': {'color': 'black'}},
+                        text=['{:s}<br>Average {:s} rating: {:.2f}'.format(loca, feature_name, n) for loca, n in zip(df['Location'], df[feature_name])],
+                        )],
+
+            'layout': go.Layout(
+                        autosize=True,
+                        hovermode='closest',
+                        margin={'l': 0, 'b': 0, 't': 0, 'r': 0},
+                        height=700,
+                        mapbox=dict(
+                            accesstoken=mapbox_access_token,
+                            bearing=0,
+                            center=dict(
+                                lat=32.96,
+                                lon=-117.2
+                            ),
+                            pitch=0,
+                            zoom=9.4
+                        ),
+            )}
+
+@app.callback(
+    dash.dependencies.Output('bar_rank', 'figure'),
+    [dash.dependencies.Input('burrito_map', 'clickData'),
+     dash.dependencies.Input('feature_rank', 'value')])
+def update_bar_rank(clickData, feature_name):
+    # Determine restaurant selected
+    # Set default for chosen restaurant
+    if clickData is None:
+        rest_chose = 'taco stand'
+    else:
+        rest_chose = clickData['points'][0]['id']
 
     # Get the top 10 restaurants
     dff = df.sort_values(by=feature_name).reset_index()[['Location', feature_name]]
-    dff = dff.loc[len(dff)-20:]
 
     return {
         'data': [{'x': dff[feature_name],
@@ -99,21 +147,21 @@ def update_graph(clickData, feature_name):
                   'type': 'bar',
                   'orientation': 'h',
                   'hoverinfo': 'text',
-                  'text': ['Average {:s} rating: {:.2f}'.format(feature_name, n) for n in dff[feature_name]],
+                  'text': ['{:s}: {:.2f} average {:s} rating'.format(loca, n, feature_name) for loca, n in zip(dff['Location'], dff[feature_name])],
                   'unselected': {'marker': {'opacity': 0.5, 'color': 'black'}},
                   'selectedpoints': [list(dff['Location']).index(rest_chose)]}],
         'layout': go.Layout(
             yaxis={'title': ''},
             xaxis={'title': 'Average ' + feature_name + ' rating'},
-            margin={'l': 200, 'b': 40, 't': 10, 'r': 0},
+            margin={'l': 200, 'b': 40, 't': 30, 'r': 0},
             hovermode='closest',
-            height=600
+            height=700
         )
     }
 
 @app.callback(
     dash.dependencies.Output('bar_features', 'figure'),
-    [dash.dependencies.Input('bar_rank', 'clickData'),
+    [dash.dependencies.Input('burrito_map', 'clickData'),
      dash.dependencies.Input('feature_rank', 'value')])
 def make_bar_features(clickData, feature_selected):
     # Determine restaurant selected
@@ -121,7 +169,7 @@ def make_bar_features(clickData, feature_selected):
     if clickData is None:
         rest_chose = 'taco stand'
     else:
-        rest_chose = clickData['points'][0]['y']
+        rest_chose = clickData['points'][0]['id']
 
     # Get features for restaurant of interest
     df_rest = df.loc[df['Location'] == rest_chose]
@@ -145,7 +193,7 @@ def make_bar_features(clickData, feature_selected):
                    'titlefont': {'size': 24},
                    'tickfont': {'size': 16},
                    'range': [0, 5]},
-            margin={'l': 100, 'b': 40, 't': 50, 'r': 20},
+            margin={'l': 90, 'b': 60, 't': 40, 'r': 20},
             hovermode='closest',
             height=300,
             annotations=[{
@@ -155,7 +203,7 @@ def make_bar_features(clickData, feature_selected):
                 'text': '<a href="' + rest_url + '">' + rest_chose + '</a>',
                 'font': {'size': 24}},
                 {
-                'x': 1, 'y': 1, 'xanchor': 'right', 'yanchor': 'bottom',
+                'x': 1, 'y': -.2, 'xanchor': 'right', 'yanchor': 'bottom',
                 'xref': 'paper', 'yref': 'paper', 'showarrow': False,
                 'align': 'left', 'bgcolor': 'rgba(255, 255, 255, 0.5)',
                 'text': '# burritos: {:d}'.format(N_burritos),
@@ -165,7 +213,7 @@ def make_bar_features(clickData, feature_selected):
 
 @app.callback(
     dash.dependencies.Output('scatter_features', 'figure'),
-    [dash.dependencies.Input('bar_rank', 'clickData'),
+    [dash.dependencies.Input('burrito_map', 'clickData'),
      dash.dependencies.Input('feature_scatterx', 'value'),
      dash.dependencies.Input('feature_scattery', 'value')])
 def make_scatter(clickData, featx, featy):
@@ -174,7 +222,7 @@ def make_scatter(clickData, featx, featy):
     if clickData is None:
         rest_chose = 'taco stand'
     else:
-        rest_chose = clickData['points'][0]['y']
+        rest_chose = clickData['points'][0]['id']
 
     # Get features for restaurant of interest
     df_rest = df.loc[df['Location'] == rest_chose]
@@ -194,7 +242,7 @@ def make_scatter(clickData, featx, featy):
         'layout': go.Layout(
             yaxis={'title': featy},
             xaxis={'title': featx},
-            margin={'l': 100, 'b': 40, 't': 50, 'r': 20},
+            margin={'l': 50, 'b': 40, 't': 20, 'r': 20},
             hovermode='closest',
             height=300,
             width=350

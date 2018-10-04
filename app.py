@@ -53,39 +53,56 @@ app.layout = html.Div([
                   style={'width': '32%', 'display': 'inline-block'}),
 
         dcc.Graph(id='bar_rank',
-                  style={'width': '36%', 'display': 'inline-block'}),
+                  style={'width': '38%', 'display': 'inline-block'}),
 
         html.Div([
             html.Div([
-                html.Div([
-                    'Select features to compare'],
-                    style={'width': '30%', 'display': 'inline-block'}),
+                html.Div(['Compare features:'],
+                    style={'width': '20%', 'display': 'inline-block'}),
                 html.Div([
                     dcc.Dropdown(
                     id='feature_scatterx',
                     options=[{'label': i, 'value': i} for i in feature_list],
                     value='Cost')],
-                    style={'width': '30%', 'display': 'inline-block'}),
+                    style={'width': '40%', 'display': 'inline-block'}),
                 html.Div([
                     dcc.Dropdown(
                     id='feature_scattery',
                     options=[{'label': i, 'value': i} for i in feature_list],
                     value='overall')],
-                    style={'width': '30%', 'display': 'inline-block'})
+                    style={'width': '40%', 'display': 'inline-block'})
                 ]),
             dcc.Graph(id='scatter_features'),
             dcc.Graph(id='bar_features')],
             style={'width': '28%', 'float': 'right',
                    'display': 'inline-block'}),
 
+
+    # Hidden div inside the app that stores the intermediate value
+    html.Div(id='intermediate-df', style={'display': 'none'})
+
     ])
 ])
+
+
+@app.callback(
+    dash.dependencies.Output('intermediate-df', 'children'),
+    [dash.dependencies.Input('feature_rank', 'value')])
+def clean_data(value):
+    # Compute df to plot
+    df_nonan = df.dropna(subset=[value])
+
+    # more generally, this line would be
+    # json.dumps(cleaned_df)
+    return df_nonan.to_json(orient='split')
+
 
 @app.callback(
     dash.dependencies.Output('burrito_map', 'figure'),
     [dash.dependencies.Input('burrito_map', 'clickData'),
-     dash.dependencies.Input('feature_rank', 'value')])
-def update_map(clickData, feature_name):
+     dash.dependencies.Input('feature_rank', 'value'),
+     dash.dependencies.Input('intermediate-df', 'children')])
+def update_map(clickData, feature_name, jsonified_cleaned_data):
     # Determine restaurant selected
     # Set default for chosen restaurant
     if clickData is None:
@@ -93,20 +110,22 @@ def update_map(clickData, feature_name):
     else:
         rest_chose = clickData['points'][0]['id']
 
-    norm_feature = np.exp(df[feature_name])
+    df_nonan = pd.read_json(jsonified_cleaned_data, orient='split')
+
+    norm_feature = np.exp(df_nonan[feature_name])
     norm_feature = norm_feature - np.min(norm_feature)
-    norm_feature = 6 + 10*(norm_feature / np.max(norm_feature))
+    norm_feature = 6 + 10 * (norm_feature / np.max(norm_feature))
 
     return {'data': [go.Scattermapbox(
-                        lat=df['Latitude'],
-                        lon=df['Longitude'],
-                        ids=df['Location'],
+                        lat=df_nonan['Latitude'],
+                        lon=df_nonan['Longitude'],
+                        ids=df_nonan['Location'],
                         mode='markers',
                         marker={'size': norm_feature},
                         hoverinfo='text',
-                        selectedpoints=[list(df['Location']).index(rest_chose)],
+                        selectedpoints=[list(df_nonan['Location']).index(rest_chose)],
                         unselected={'marker': {'color': 'black'}},
-                        text=['{:s}<br>Average {:s} rating: {:.2f}'.format(loca, feature_name, n) for loca, n in zip(df['Location'], df[feature_name])],
+                        text=['{:s}<br>Average {:s} rating: {:.2f}'.format(loca, feature_name, n) for loca, n in zip(df_nonan['Location'], df_nonan[feature_name])],
                         )],
 
             'layout': go.Layout(
@@ -129,8 +148,9 @@ def update_map(clickData, feature_name):
 @app.callback(
     dash.dependencies.Output('bar_rank', 'figure'),
     [dash.dependencies.Input('burrito_map', 'clickData'),
-     dash.dependencies.Input('feature_rank', 'value')])
-def update_bar_rank(clickData, feature_name):
+     dash.dependencies.Input('feature_rank', 'value'),
+     dash.dependencies.Input('intermediate-df', 'children')])
+def update_bar_rank(clickData, feature_name, jsonified_cleaned_data):
     # Determine restaurant selected
     # Set default for chosen restaurant
     if clickData is None:
@@ -138,8 +158,9 @@ def update_bar_rank(clickData, feature_name):
     else:
         rest_chose = clickData['points'][0]['id']
 
-    # Get the top 10 restaurants
-    dff = df.sort_values(by=feature_name).reset_index()[['Location', feature_name]]
+    # Sort taco shops
+    df_nonan = pd.read_json(jsonified_cleaned_data, orient='split')
+    dff = df_nonan.sort_values(by=feature_name).reset_index()[['Location', feature_name]]
 
     return {
         'data': [{'x': dff[feature_name],
@@ -153,7 +174,7 @@ def update_bar_rank(clickData, feature_name):
         'layout': go.Layout(
             yaxis={'title': ''},
             xaxis={'title': 'Average ' + feature_name + ' rating'},
-            margin={'l': 200, 'b': 40, 't': 30, 'r': 0},
+            margin={'l': 210, 'b': 40, 't': 30, 'r': 0},
             hovermode='closest',
             height=700
         )

@@ -98,6 +98,8 @@ def update_graph(clickData, feature_name):
                   'y': dff['Location'],
                   'type': 'bar',
                   'orientation': 'h',
+                  'hoverinfo': 'text',
+                  'text': ['Average {:s} rating: {:.2f}'.format(feature_name, n) for n in dff[feature_name]],
                   'unselected': {'marker': {'opacity': 0.5, 'color': 'black'}},
                   'selectedpoints': [list(dff['Location']).index(rest_chose)]}],
         'layout': go.Layout(
@@ -133,6 +135,8 @@ def make_bar_features(clickData, feature_selected):
                   'title': rest_chose,
                   'type': 'bar',
                   'orientation': 'h',
+                  'hoverinfo': 'text',
+                  'text': ['Average {:s} rating: {:.2f}'.format(s, n) for s, n in zip(feature_dict.keys(), feature_dict.values())],
                   'unselected': {'marker': {'opacity': 0.5, 'color': 'black'}},
                   'selectedpoints': [list(feature_dict.keys()).index(feature_selected)]}],
         'layout': go.Layout(
@@ -180,6 +184,7 @@ def make_scatter(clickData, featx, featy):
         'data': [go.Scatter(
             x=df[featx],
             y=df[featy],
+            hoverinfo='text',
             text=['{:s}<br>${:.2f}'.format(loc, price) for loc, price in zip(df['Location'], df[featx])],
             mode='markers',
             marker={'size': 6 + 5 * np.log10(df['N'])},
